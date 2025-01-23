@@ -12,7 +12,7 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-const PORT = 5002;
+const PORT = 9004;
 
 // MongoDB Connection
 mongoose
