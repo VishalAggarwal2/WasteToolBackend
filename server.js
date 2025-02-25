@@ -176,6 +176,98 @@ app.get('/api/products', async (req, res) => {
 });
 
 
+// Cart Schema
+const cartSchema = new mongoose.Schema({
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'UserWasteWithImage', required: true },
+  items: [
+    {
+      product: { type: mongoose.Schema.Types.ObjectId, ref: 'productSchemaImage', required: true },
+      quantity: { type: Number, required: true, min: 1 }
+    }
+  ]
+});
+const Cart = mongoose.model('Cart', cartSchema);
+
+// Add to cart
+app.post('/cart', async (req, res) => {
+  try {
+    const { userId, items } = req.body; // items is an array of objects, each containing productId and quantity
+
+    // Check if userId and items are provided
+    if (!userId || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'Invalid request data' });
+    }
+
+    // Retrieve the user's cart
+    let cart = await Cart.findOne({ user: userId });
+    if (!cart) {
+      // If no cart exists, create a new one
+      cart = new Cart({ user: userId, items: [] });
+    }
+
+    // Iterate over the items and update the cart
+    for (let { productId, quantity } of items) {
+      if (!productId || !quantity || quantity < 1) {
+        return res.status(400).json({ message: 'Invalid product data' });
+      }
+
+      const existingProductIndex = cart.items.findIndex(item => item.product.toString() === productId);
+      
+      if (existingProductIndex !== -1) {
+        // If the product exists, update the quantity
+        cart.items[existingProductIndex].quantity += quantity;
+      } else {
+        // If the product is not in the cart, add it
+        cart.items.push({ product: productId, quantity });
+      }
+    }
+
+    // Save the updated cart to the database
+    await cart.save();
+    res.json(cart);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+// Get user's cart
+app.get('/cart/:userId', async (req, res) => {
+  try {
+    const cart = await Cart.findOne({ user: req.params.userId }).populate('items.product');
+    if (!cart) {
+      return res.status(404).json({ message: 'Cart not found' });
+    }
+    res.json(cart);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+// Remove item from cart
+app.delete('/cart/:userId/:productId', async (req, res) => {
+  try {
+    const { userId, productId } = req.params;
+    let cart = await Cart.findOne({ user: userId });
+    if (!cart) {
+      return res.status(404).json({ message: 'Cart not found' });
+    }
+
+    cart.items = cart.items.filter(item => item.product.toString() !== productId);
+    await cart.save();
+    res.json(cart);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+app.get("/",(req,res)=>{
+  res.send("App Backend Running Succ")
+})
+
+
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
