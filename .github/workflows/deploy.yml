@@ -1,0 +1,34 @@
+name: Deployment Workflow
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: npm install --force
+
+      - name: SSH Deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: "62.72.6.245"
+          username: "root"
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Load NVM and set up the Node.js environment
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
+            nvm use v22.7.0 # Use the specific Node.js version you need
+
+            cd /root/wasteImageToolBackend
+            git pull https://${{ secrets.TOKEN }}:${{ secrets.TOKEN }}@github.com/Heydo-Tech/wasteImageToolBackend.git
+            npm install --force
+            pm2 reload 40 --update-env
