@@ -88,7 +88,7 @@ app.post('/login', async (req, res) => {
     }
 
     // logData(`User logged in: ${user.name}, Role: ${user.role}`);
-    res.json({ message: `Welcome, ${user.role} ${user.name}!`, role: user.role, name: user.name, success: true });
+    res.json({ message: `Welcome, ${user.role} ${user.name}!`,userId:user._id, role: user.role, name: user.name, success: true });
   } catch (error) {
     // logData(`Error logging in: ${error.message}`);
     res.status(500).json({ message: 'Error logging in' });
