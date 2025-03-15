@@ -252,6 +252,37 @@ app.delete('/cart/:userId/:productId', async (req, res) => {
   }
 });
 
+app.get('/carts', async (req, res) => {
+  try {
+    // Find all carts and populate user and product details
+    const carts = await Cart.find()
+      .populate({
+        path: 'user',
+        select: 'name role password', // Include all fields from the user schema
+      })
+      .populate({
+        path: 'items.product',
+        select: 'productSubcategory productName Quantity sku Image', // Include all fields from the product schema
+      });
+
+    if (!carts || carts.length === 0) {
+      return res.status(404).json({ message: 'No carts found' });
+    }
+
+    // Filter out items with null products (optional)
+    const filteredCarts = carts.map(cart => {
+      cart.items = cart.items.filter(item => item.product !== null); // Remove items with null products
+      return cart;
+    });
+
+    // Return all carts with populated details
+    res.status(200).json(filteredCarts);
+  } catch (error) {
+    console.error('Error fetching all carts:', error);
+    res.status(500).json({ message: 'Server error while fetching carts' });
+  }
+});
+
 
 app.get("/",(req,res)=>{
   res.send("App Backend Running Succ")
