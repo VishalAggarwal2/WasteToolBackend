@@ -54,6 +54,7 @@ const userSchema = new mongoose.Schema({
   role: { type: String, required: true },
   password: { type: String, required: true },
 });
+
 const User = mongoose.model('UserWasteWithImage', userSchema);
 // Login route
 app.post('/login', async (req, res) => {
@@ -174,11 +175,16 @@ const cartSchema = new mongoose.Schema({
       product: { type: mongoose.Schema.Types.ObjectId, ref: 'productSchemaImage', required: true },
       quantity: { type: Number, required: true, min: 1 }
     }
-  ]
-});
+  ],
+  dateTime: { type: Date, default: Date.now }  
+}, { timestamps: true });
 const Cart = mongoose.model('Cart', cartSchema);
 
-// Add to cart
+cartSchema.pre('save', function (next) {
+  this.dateTime = new Date();
+  next();
+});
+
 app.post('/cart', async (req, res) => {
   try {
     const { userId, items } = req.body; // items is an array of objects, each containing productId and quantity
