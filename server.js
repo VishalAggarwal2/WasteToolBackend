@@ -9,13 +9,10 @@ const csv = require('csv-parser');
 const FormData = require('form-data');
 const cors = require('cors');
 const { type } = require('os');
-
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
-
 const PORT = 9004;
-
 // MongoDB Connection
 mongoose
   .connect('mongodb+srv://vishalaggarwal270:Nvy1HI7eJ2guvoEN@barcodeproject.d43bd.mongodb.net/mydatabase', {
@@ -28,10 +25,8 @@ mongoose
 // Cloudinary Configuration
 const uploadUrl = 'https://api.cloudinary.com/v1_1/dku5orixv/image/upload';
 const uploadPreset = 'apnimandi';
-
 // Product Schema
 const productSchemaImage = new mongoose.Schema({
-
     productSubcategory: {
         type: String,
         required: true
@@ -54,17 +49,12 @@ const productSchemaImage = new mongoose.Schema({
 
 const ProductwithImage = mongoose.model('productSchemaImage', productSchemaImage);
 
-
-
-
-
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   role: { type: String, required: true },
   password: { type: String, required: true },
 });
 const User = mongoose.model('UserWasteWithImage', userSchema);
-
 // Login route
 app.post('/login', async (req, res) => {
   try {
@@ -88,7 +78,7 @@ app.post('/login', async (req, res) => {
     }
 
     // logData(`User logged in: ${user.name}, Role: ${user.role}`);
-    res.json({ message: `Welcome, ${user.role} ${user.name}!`, role: user.role, name: user.name, success: true });
+    res.json({ message: `Welcome, ${user.role} ${user.name}!`,userId:user._id, role: user.role, name: user.name, success: true });
   } catch (error) {
     // logData(`Error logging in: ${error.message}`);
     res.status(500).json({ message: 'Error logging in' });
@@ -267,10 +257,41 @@ app.get("/",(req,res)=>{
   res.send("App Backend Running Succ")
 })
 
+app.get('/carts', async (req, res) => {
+  try {
+    // Find all carts and populate user and product details
+    const carts = await Cart.find()
+      .populate({
+        path: 'user',
+        select: 'name role password', // Include all fields from the user schema
+      })
+      .populate({
+        path: 'items.product',
+        select: 'productSubcategory productName Quantity sku Image', // Include all fields from the product schema
+      });
 
+    if (!carts || carts.length === 0) {
+      return res.status(404).json({ message: 'No carts found' });
+    }
 
+    // Filter out items with null products (optional)
+    const filteredCarts = carts.map(cart => {
+      cart.items = cart.items.filter(item => item.product !== null); // Remove items with null products
+      return cart;
+    });
+
+    // Return all carts with populated details
+    res.status(200).json(filteredCarts);
+  } catch (error) {
+    console.error('Error fetching all carts:', error);
+    res.status(500).json({ message: 'Server error while fetching carts' });
+  }
+});
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
-    //processCSV(); // Call the function to process CSV on server start
+    //processCSV();  
+    // Call the function to process CSV on server start
 });
+
+
 
