@@ -173,12 +173,14 @@ const cartSchema = new mongoose.Schema({
   items: [
     {
       product: { type: mongoose.Schema.Types.ObjectId, ref: 'productSchemaImage', required: true },
-      quantity: { type: Number, required: true, min: 1 }
+      quantity: { type: Number, required: true, min: 1 },
+      dateTime: { type: Date, default: Date.now }  // Store timestamp for each item
     }
-  ],
-  dateTime: { type: Date, default: Date.now }  
+  ]
 }, { timestamps: true });
+
 const Cart = mongoose.model('Cart', cartSchema);
+
 
 cartSchema.pre('save', function (next) {
   this.dateTime = new Date();
@@ -187,21 +189,18 @@ cartSchema.pre('save', function (next) {
 
 app.post('/cart', async (req, res) => {
   try {
-    const { userId, items } = req.body; // items is an array of objects, each containing productId and quantity
+    const { userId, items } = req.body; // items should be an array of { productId, quantity }
 
-    // Check if userId and items are provided
     if (!userId || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'Invalid request data' });
     }
 
-    // Retrieve the user's cart
     let cart = await Cart.findOne({ user: userId });
+
     if (!cart) {
-      // If no cart exists, create a new one
       cart = new Cart({ user: userId, items: [] });
     }
 
-    // Iterate over the items and update the cart
     for (let { productId, quantity } of items) {
       if (!productId || !quantity || quantity < 1) {
         return res.status(400).json({ message: 'Invalid product data' });
@@ -210,22 +209,21 @@ app.post('/cart', async (req, res) => {
       const existingProductIndex = cart.items.findIndex(item => item.product.toString() === productId);
       
       if (existingProductIndex !== -1) {
-        // If the product exists, update the quantity
+        // Update quantity and timestamp
         cart.items[existingProductIndex].quantity += quantity;
+        cart.items[existingProductIndex].dateTime = new Date();
       } else {
-        // If the product is not in the cart, add it
-        cart.items.push({ product: productId, quantity });
+        // Add new item with timestamp
+        cart.items.push({ product: productId, quantity, dateTime: new Date() });
       }
     }
 
-    // Save the updated cart to the database
     await cart.save();
     res.json(cart);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
-
 
 // Get user's cart
 app.get('/cart/:userId', async (req, res) => {
