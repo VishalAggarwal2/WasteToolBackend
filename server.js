@@ -206,16 +206,8 @@ app.post('/cart', async (req, res) => {
         return res.status(400).json({ message: 'Invalid product data' });
       }
 
-      const existingProductIndex = cart.items.findIndex(item => item.product.toString() === productId);
-      
-      if (existingProductIndex !== -1) {
-        // Update quantity and timestamp
-        cart.items[existingProductIndex].quantity += quantity;
-        cart.items[existingProductIndex].dateTime = new Date();
-      } else {
-        // Add new item with timestamp
-        cart.items.push({ product: productId, quantity, dateTime: new Date() });
-      }
+      // Instead of updating an existing entry, push a new one every time
+      cart.items.push({ product: productId, quantity, dateTime: new Date() });
     }
 
     await cart.save();
@@ -224,6 +216,7 @@ app.post('/cart', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
 
 // Get user's cart
 app.get('/cart/:userId', async (req, res) => {
@@ -255,7 +248,6 @@ app.delete('/cart/:userId/:productId', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
 app.get('/carts', async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
@@ -270,17 +262,22 @@ app.get('/carts', async (req, res) => {
     const totalRecords = totalItems.length > 0 ? totalItems[0].total : 0;
     const totalPages = Math.ceil(totalRecords / limit);
 
-    // Fetch carts but limit the items per page
-    const carts = await Cart.find().sort({ createdAt: -1 })
+    // Fetch carts and populate user and product details
+    const carts = await Cart.find().sort({ createdAt: -1 }) // Sort carts by creation date
       .populate({ path: 'user', select: 'name role' })
       .populate({
         path: 'items.product',
         select: 'productSubcategory productName Quantity sku Image'
       });
 
-    // Apply pagination manually on `items` inside each cart
+    // Apply pagination manually and sort items by dateTime
     const paginatedCarts = carts.map(cart => {
-      const paginatedItems = cart.items.slice(skip, skip + parseInt(limit));
+      // Sort items by dateTime (most recent first)
+      const sortedItems = cart.items.sort((a, b) => b.dateTime - a.dateTime);
+      
+      // Apply pagination to items
+      const paginatedItems = sortedItems.slice(skip, skip + parseInt(limit));
+
       return { ...cart.toObject(), items: paginatedItems };
     });
 
@@ -302,6 +299,7 @@ app.get('/carts', async (req, res) => {
     res.status(500).json({ message: 'Server error while fetching carts' });
   }
 });
+
 
 app.get("/",(req,res)=>{
   res.send("App Backend Running Succ")
