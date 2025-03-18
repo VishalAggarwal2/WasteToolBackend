@@ -271,7 +271,7 @@ app.get('/carts', async (req, res) => {
     const totalPages = Math.ceil(totalRecords / limit);
 
     // Fetch carts but limit the items per page
-    const carts = await Cart.find()
+    const carts = await Cart.find().sort({ createdAt: -1 })
       .populate({ path: 'user', select: 'name role' })
       .populate({
         path: 'items.product',
