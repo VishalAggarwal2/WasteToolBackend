@@ -258,35 +258,50 @@ app.delete('/cart/:userId/:productId', async (req, res) => {
 
 app.get('/carts', async (req, res) => {
   try {
-    // Find all carts and populate user and product details
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Get total count of all items inside carts for pagination metadata
+    const totalItems = await Cart.aggregate([
+      { $unwind: "$items" },
+      { $count: "total" }
+    ]);
+
+    const totalRecords = totalItems.length > 0 ? totalItems[0].total : 0;
+    const totalPages = Math.ceil(totalRecords / limit);
+
+    // Fetch carts but limit the items per page
     const carts = await Cart.find()
-      .populate({
-        path: 'user',
-        select: 'name role password', // Include all fields from the user schema
-      })
+      .populate({ path: 'user', select: 'name role' })
       .populate({
         path: 'items.product',
-        select: 'productSubcategory productName Quantity sku Image', // Include all fields from the product schema
+        select: 'productSubcategory productName Quantity sku Image'
       });
 
-    if (!carts || carts.length === 0) {
+    // Apply pagination manually on `items` inside each cart
+    const paginatedCarts = carts.map(cart => {
+      const paginatedItems = cart.items.slice(skip, skip + parseInt(limit));
+      return { ...cart.toObject(), items: paginatedItems };
+    });
+
+    if (!paginatedCarts || paginatedCarts.length === 0) {
       return res.status(404).json({ message: 'No carts found' });
     }
 
-    // Filter out items with null products (optional)
-    const filteredCarts = carts.map(cart => {
-      cart.items = cart.items.filter(item => item.product !== null); // Remove items with null products
-      return cart;
+    res.status(200).json({
+      carts: paginatedCarts,
+      pagination: {
+        totalItems: totalRecords,
+        totalPages,
+        currentPage: parseInt(page),
+        limit: parseInt(limit)
+      }
     });
-
-    // Return all carts with populated details
-    res.status(200).json(filteredCarts);
   } catch (error) {
-    console.error('Error fetching all carts:', error);
+    console.error('Error fetching carts:', error);
     res.status(500).json({ message: 'Server error while fetching carts' });
   }
 });
-
 
 app.get("/",(req,res)=>{
   res.send("App Backend Running Succ")
@@ -294,34 +309,56 @@ app.get("/",(req,res)=>{
 
 app.get('/carts', async (req, res) => {
   try {
-    // Find all carts and populate user and product details
+    let { page = 1, limit = 10 } = req.query;
+    page = parseInt(page);
+    limit = parseInt(limit);
+    const skip = (page - 1) * limit;
+
+    // Get total count of carts
+    const totalCarts = await Cart.countDocuments();
+
+    // Fetch paginated carts with user and product details
     const carts = await Cart.find()
       .populate({
         path: 'user',
-        select: 'name role password', // Include all fields from the user schema
+        select: 'name role', // Include only necessary fields
       })
       .populate({
         path: 'items.product',
-        select: 'productSubcategory productName Quantity sku Image', // Include all fields from the product schema
-      });
+        select: 'productSubcategory productName Quantity sku Image', // Include only necessary fields
+      })
+      .skip(skip)
+      .limit(limit);
 
     if (!carts || carts.length === 0) {
       return res.status(404).json({ message: 'No carts found' });
     }
 
-    // Filter out items with null products (optional)
-    const filteredCarts = carts.map(cart => {
-      cart.items = cart.items.filter(item => item.product !== null); // Remove items with null products
-      return cart;
-    });
+    // Remove items with null products
+    const filteredCarts = carts.map(cart => ({
+      ...cart.toObject(),
+      items: cart.items.filter(item => item.product !== null)
+    }));
 
-    // Return all carts with populated details
-    res.status(200).json(filteredCarts);
+    // Calculate total pages
+    const totalPages = Math.ceil(totalCarts / limit);
+
+    // Return paginated carts with metadata
+    res.status(200).json({
+      carts: filteredCarts,
+      pagination: {
+        totalCarts,
+        totalPages,
+        currentPage: page,
+        limit
+      }
+    });
   } catch (error) {
-    console.error('Error fetching all carts:', error);
+    console.error('Error fetching carts:', error);
     res.status(500).json({ message: 'Server error while fetching carts' });
   }
 });
+
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     //processCSV();  
