@@ -21,7 +21,7 @@ mongoose
   })
   .then(() => console.log('Connected to MongoDB'))
   .catch((err) => console.error('MongoDB connection error:', err));
-
+  
 // Cloudinary Configuration
 const uploadUrl = 'https://api.cloudinary.com/v1_1/dku5orixv/image/upload';
 const uploadPreset = 'apnimandi';
