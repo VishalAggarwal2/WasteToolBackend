@@ -248,6 +248,8 @@ app.delete('/cart/:userId/:productId', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
+
 app.get('/carts', async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
@@ -270,6 +272,7 @@ app.get('/carts', async (req, res) => {
         select: 'productSubcategory productName Quantity sku Image'
       });
 
+
     // Apply pagination manually and sort items by dateTime
     const paginatedCarts = carts.map(cart => {
       // Sort items by dateTime (most recent first)
@@ -277,6 +280,7 @@ app.get('/carts', async (req, res) => {
       
       // Apply pagination to items
       const paginatedItems = sortedItems.slice(skip, skip + parseInt(limit));
+      console.log(paginatedItems);
 
       return { ...cart.toObject(), items: paginatedItems };
     });
@@ -305,57 +309,116 @@ app.get("/",(req,res)=>{
   res.send("App Backend Running Succ")
 })
 
-app.get('/carts', async (req, res) => {
+// app.get('/carts', async (req, res) => {
+//   try {
+//     console.log("Hlllo ");
+//     let { page = 1, limit = 10 } = req.query;
+//     page = parseInt(page);
+//     limit = parseInt(limit);
+//     const skip = (page - 1) * limit;
+
+//     // Get total count of carts
+//     const totalCarts = await Cart.countDocuments();
+
+//     // Fetch paginated carts with user and product details
+//     const carts = await Cart.find()
+//       .populate({
+//         path: 'user',
+//         select: 'name role', // Include only necessary fields
+//       })
+//       .populate({
+//         path: 'items.product',
+//         select: 'productSubcategory productName Quantity sku Image', // Include only necessary fields
+//       })
+//       .skip(skip)
+//       .limit(limit);
+
+//     if (!carts || carts.length === 0) {
+//       return res.status(404).json({ message: 'No carts found' });
+//     }
+
+//     // Remove items with null products
+//     const filteredCarts = carts.map(cart => ({
+//       ...cart.toObject(),
+//       items: cart.items.filter(item => item.product !== null)
+//     }));
+
+//     // Calculate total pages
+//     const totalPages = Math.ceil(totalCarts / limit);
+
+//     // Return paginated carts with metadata
+//     console.log(filteredCarts);
+//     res.status(200).json({
+//       carts: filteredCarts,
+//       pagination: {
+//         totalCarts,
+//         totalPages,
+//         currentPage: page,
+//         limit
+//       }
+//     });
+//   } catch (error) {
+//     console.error('Error fetching carts:', error);
+//     res.status(500).json({ message: 'Server error while fetching carts' });
+//   }
+// });
+
+
+
+
+
+
+app.get('/carts/flat', async (req, res) => {
   try {
-    let { page = 1, limit = 10 } = req.query;
-    page = parseInt(page);
-    limit = parseInt(limit);
-    const skip = (page - 1) * limit;
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Get total count of carts
-    const totalCarts = await Cart.countDocuments();
-
-    // Fetch paginated carts with user and product details
+    // Flatten all cart items with user and product populated
     const carts = await Cart.find()
-      .populate({
-        path: 'user',
-        select: 'name role', // Include only necessary fields
-      })
+      .populate({ path: 'user', select: 'name role' })
       .populate({
         path: 'items.product',
-        select: 'productSubcategory productName Quantity sku Image', // Include only necessary fields
-      })
-      .skip(skip)
-      .limit(limit);
+        select: 'productSubcategory productName Quantity sku Image'
+      });
 
-    if (!carts || carts.length === 0) {
-      return res.status(404).json({ message: 'No carts found' });
-    }
+    let flatItems = [];
 
-    // Remove items with null products
-    const filteredCarts = carts.map(cart => ({
-      ...cart.toObject(),
-      items: cart.items.filter(item => item.product !== null)
-    }));
+    carts.forEach(cart => {
+      cart.items.forEach(item => {
+        flatItems.push({
+          product: item.product,
+          quantity: item.quantity,
+          dateTime: item.dateTime,
+          user: cart.user
+        });
+      });
+    });
 
-    // Calculate total pages
-    const totalPages = Math.ceil(totalCarts / limit);
+    // Sort by most recent dateTime
+    flatItems.sort((a, b) => b.dateTime - a.dateTime);
 
-    // Return paginated carts with metadata
+    const totalItems = flatItems.length;
+    const totalPages = Math.ceil(totalItems / limit);
+
+    // Paginate the flat list
+    const paginatedItems = flatItems.slice(skip, skip + parseInt(limit));
+
     res.status(200).json({
-      carts: filteredCarts,
+      items: paginatedItems,
       pagination: {
-        totalCarts,
+        totalItems,
         totalPages,
-        currentPage: page,
-        limit
+        currentPage: parseInt(page),
+        limit: parseInt(limit)
       }
     });
+
   } catch (error) {
-    console.error('Error fetching carts:', error);
-    res.status(500).json({ message: 'Server error while fetching carts' });
+    console.error('Error in /carts/flat:', error);
+    res.status(500).json({ message: 'Server error while fetching flat cart items' });
   }
 });
+
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
